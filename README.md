@@ -3,5 +3,5 @@ Student ID: m2507596
 Contents: 
 - NGS Pipeline Scripts:
     - section2_ngs_pipeline_safe.sh
-    - section2_ngs_pipeline_bcftools.sh
+    - section2_ngs_pipeline_bcftools.sh (Q2.6)
 - R/RStudio analysis (Rmd + HTML)
