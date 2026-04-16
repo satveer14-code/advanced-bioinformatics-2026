@@ -1,0 +1,232 @@
+---
+title: "Advanced Bioinformatics 2026 assessment"
+author: "m2507596"
+date: "2026-04-13"
+output: html_document
+---
+
+```{r, include=FALSE}
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+```
+
+```{r}
+# Install/load packages (run once)
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+if (!require("DESeq2")) BiocManager::install("DESeq2")
+if (!require("pheatmap")) install.packages("pheatmap")
+if (!require("ggplot2")) install.packages("ggplot2")
+
+library(DESeq2)
+library(pheatmap) 
+library(ggplot2)
+```
+
+## Task 3.1
+```{r}
+sum(5:55)
+```
+
+## Task 3.2
+```{r}
+sumfun <- function(n) {
+  sum(5:n)
+}
+
+sumfun(10)
+sumfun(20)
+sumfun(100)
+
+```
+
+## Task 3.3
+```{r}
+fib <- numeric(12)
+fib[1] <- 1
+fib[2] <- 1
+
+for (i in 3:12) {
+  fib[i] <- fib[i-1] + fib[i-2]
+}
+
+fib
+```
+
+## Task 3.4
+```{r}
+library(ggplot2)
+
+ggplot(mtcars, aes(x = as.factor(gear), y = mpg, fill = as.factor(gear))) +
+  geom_boxplot() +
+  labs(x = "Number of gears", y = "Miles per gallon", fill = "Gears") +
+  theme_minimal()
+```
+
+## Task 3.5
+```{r}
+data(cars)
+model_lin <- lm(dist ~ speed, data = cars)
+summary(model_lin)
+```
+
+## Task 3.6 
+```{r}
+library(ggplot2)
+
+ggplot(cars, aes(x = speed, y = dist)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    x = "Speed (mph)",
+    y = "Distance (ft)",
+    title = "Cars: speed vs stopping distance"
+  ) +
+  theme_minimal()
+
+```
+
+## Task 3.7
+```{r}
+cars$speed2 <- cars$speed^2
+model_rt <- lm(dist ~ speed + speed2, data = cars)
+summary(model_rt)
+```
+
+```{r}
+speed_coef <- coef(model_rt)["speed"]
+reaction_time <- speed_coef / 1.467
+reaction_time
+```
+
+```{r}
+library(ggplot2)
+ggplot(cars, aes(x = speed, y = dist)) +
+  geom_point() +
+  stat_smooth(method = "lm", formula = y ~ x + I(x^2), se = FALSE, color = "blue") +
+  labs(x = "Speed (mph)", y = "Stopping distance (ft)")
+```
+
+## Task 3.8
+```{r}
+setwd("/Users/satveercauleechurn/Downloads/LMS_RNAseq_short-master-2023-final/course/exercises/data")
+
+counts <- read.csv("exercise1_counts.csv", 
+                   header = TRUE, 
+                   row.names = 1)
+
+sample_description <- read.table("exercise1_sample_description.info", 
+                                 header = TRUE, 
+                                 row.names = 1)
+
+head(counts)
+head(sample_description)
+
+dim(counts)
+dim(sample_description)
+```
+
+## Task 3.9 
+
+```{r}
+coldata <- data.frame(sample_description)
+rownames(coldata) <- colnames(counts)
+coldata$condition <- as.factor(coldata$condition)
+coldata$batch <- as.factor(coldata$batch)
+
+head(coldata)
+all(colnames(counts) == rownames(coldata))
+dim(counts)
+dim(coldata)
+```
+
+## Task 3.10
+
+```{r}
+library(DESeq2)
+
+dds <- DESeqDataSetFromMatrix(countData = counts, 
+                              colData = coldata, 
+                              design = ~ condition)
+
+dds
+```
+
+## Task 3.11
+```{r}
+rld <- rlog(dds, blind = FALSE)
+vsd <- vst(dds, blind = FALSE)
+
+head(assay(rld), 3)
+head(assay(vsd), 3)
+```
+
+## Task 3.12
+```{r}
+library(pheatmap)
+
+top_genes_rlog <- order(rowMeans(assay(rld)), decreasing = TRUE)[1:40]
+top_genes_vst <- order(rowMeans(assay(vsd)), decreasing = TRUE)[1:40]
+
+pheatmap(assay(rld)[top_genes_rlog, ], 
+         scale = "row", 
+         cluster_rows = TRUE, 
+         cluster_cols = TRUE,
+         annotation_col = coldata[, c("condition", "batch")],
+         main = "rlog: Top 40 genes")
+
+pheatmap(assay(vsd)[top_genes_vst, ], 
+         scale = "row", 
+         cluster_rows = TRUE, 
+         cluster_cols = TRUE,
+         annotation_col = coldata[, c("condition", "batch")],
+         main = "VST: Top 40 genes")
+```
+
+## Task 3.13
+```{r}
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+
+library(pheatmap)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = heat.colors(100),
+         annotation_col = coldata[, c("condition", "batch")],
+         main = "Sample-to-sample distances (rlog)")
+```
+
+## Task 3.14
+```{r}
+pcaData <- plotPCA(rld, intgroup = "condition", returnData = TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+cat("PC1:", percentVar[1], "% | PC2:", percentVar[2], "%\n")
+
+plot(pcaData$PC1, pcaData$PC2, col = as.numeric(coldata$condition),
+     pch = 19, xlab = paste0("PC1: ", percentVar[1], "% variance"),
+     ylab = paste0("PC2: ", percentVar[2], "% variance"),
+     main = "PCA: rlog transformed")
+text(pcaData$PC1, pcaData$PC2, labels = rownames(coldata), pos = 3)
+legend("topright", legend = levels(coldata$condition), 
+       col = 1:length(levels(coldata$condition)), pch = 19)
+```
+
+## Task 3.15
+
+```{r}
+pcaData_vst <- plotPCA(vsd, intgroup = "condition", returnData = TRUE)
+percentVar_vst <- round(100 * attr(pcaData_vst, "percentVar"))
+
+cat("VST - PC1:", percentVar_vst[1], "% | PC2:", percentVar_vst[2], "%\n")
+
+plot(pcaData_vst$PC1, pcaData_vst$PC2, col = as.numeric(coldata$condition),
+     pch = 19, xlab = paste0("PC1: ", percentVar_vst[1], "% variance"),
+     ylab = paste0("PC2: ", percentVar_vst[2], "% variance"),
+     main = "PCA: VST transformed")
+text(pcaData_vst$PC1, pcaData_vst$PC2, labels = rownames(coldata), pos = 3)
+legend("topright", legend = levels(coldata$condition), 
+       col = 1:length(levels(coldata$condition)), pch = 19)
+```
+
